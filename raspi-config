@@ -386,6 +386,12 @@ end
 EOF
 }
 
+ensure_user_conf_dir() {
+  if [ ! -d "$HOMEDIR/.config" ]; then
+    install -d -o "$USER" -g "$USER" "$HOMEDIR/.config"
+  fi
+}
+
 get_overscan() {
   OVS=$(get_config_var disable_overscan $CONFIG)
   if [ $OVS -eq 1 ]; then
@@ -569,6 +575,7 @@ do_blanking() {
     if [ "$RET" -eq "$CURRENT" ]; then
       ASK_TO_REBOOT=1
     fi
+    ensure_user_conf_dir
     mkdir -p "$HOMEDIR/.config/labwc/"
     chown -R $USER:$USER "$HOMEDIR/.config/labwc/"
     if [ "$RET" -eq 0 ] ; then
@@ -663,6 +670,7 @@ update_labwc_keyboard() {
   VARIANT=$(grep XKBVARIANT /etc/default/keyboard | cut -d= -f2 | tr -d '"')
   OPTIONS=$(grep XKBOPTIONS /etc/default/keyboard | cut -d= -f2 | tr -d '"')
   UFILE=$LABWCENV_FILE
+  ensure_user_conf_dir
   mkdir -p "$HOMEDIR/.config/labwc/"
   chown -R $USER:$USER "$HOMEDIR/.config/labwc/"
   if [ -e $UFILE ] ; then
