@@ -2005,6 +2005,64 @@ do_network_install_ui() {
   fi
  }
 
+do_libliftoff() {
+  if [ "$INTERACTIVE" = True ]; then
+    RET=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "libliftoff Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+        "L1 Disable" "Disable libliftoff hardware overlays" \
+        "L2 Enable" "Enable libliftoff hardware overlays (experimental)" \
+        3>&1 1>&2 2>&3)
+  else
+    RET=$1
+    true
+  fi
+  if [ $? -eq 0 ]; then
+    case "$RET" in
+      L1*)
+        LIBLIFTOFF_ENABLED=0
+        STATUS="disabled"
+        ;;
+      L2*)
+        LIBLIFTOFF_ENABLED=1
+        STATUS="enabled"
+        ;;
+      *)
+        whiptail --msgbox "Programmer error, unrecognised libliftoff option" 20 60 2
+        return 1
+        ;;
+    esac
+
+    # Create the config dir and/or environment file, if needed
+    if [ -z $HOMEDIR ]; then
+      whiptail --msgbox "Unknown user home directory" 20 60 2
+      return 1
+    fi
+    LABWC_DIR="$HOMEDIR/.config/labwc"
+    if [ ! -e $LABWC_DIR ]; then
+      mkdir -p $LABWC_DIR
+      chown $USER:$USER $HOMEDIR/.config $LABWC_DIR
+    fi
+    if [ ! -e $LABWCENV_FILE ]; then
+      touch $LABWCENV_FILE
+      chown $USER:$USER $LABWCENV_FILE
+    fi
+
+    # If there is already a libliftoff line in the env file, replace it.
+    # Otherwise, add one.
+    if grep -q WLR_DRM_FORCE_LIBLIFTOFF $LABWCENV_FILE; then
+      sed -i "s/^.*WLR_DRM_FORCE_LIBLIFTOFF.*$/WLR_DRM_FORCE_LIBLIFTOFF=$LIBLIFTOFF_ENABLED/" $LABWCENV_FILE
+    else
+      echo "WLR_DRM_FORCE_LIBLIFTOFF=$LIBLIFTOFF_ENABLED" >>$LABWCENV_FILE
+    fi
+
+    ASK_TO_REBOOT=1
+  else
+    return 0
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "libliftoff is $STATUS" 20 60 1
+  fi
+}
+
 do_boot_order() {
   if [ "$INTERACTIVE" = True ]; then
     BOOTOPT=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Boot Device Order" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
@@ -3844,6 +3902,7 @@ do_advanced_menu() {
       "A7 Audio Config" "Set audio control system" \
       "A8 PCIe Speed" "Set PCIe x1 port speed" \
       "A9 Network install UI" "Select when to display the bootloader network-install UI" \
+      "A10 libliftoff" "Enable/disable hardware overlays with libliftoff (experimental)" \
       3>&1 1>&2 2>&3)
   elif is_pi ; then
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -3852,6 +3911,7 @@ do_advanced_menu() {
       "A3 Network Proxy Settings" "Configure network proxy settings" \
       "A6 Wayland" "Switch between X and Wayland backends" \
       "A7 Audio Config" "Set audio control system" \
+      "A10 libliftoff" "Enable/disable hardware overlays with libliftoff (experimental)" \
       3>&1 1>&2 2>&3)
   else
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -3859,6 +3919,7 @@ do_advanced_menu() {
       "A3 Network Proxy Settings" "Configure network proxy settings" \
       "A6 Wayland" "Switch between X and Wayland backends" \
       "A7 Audio Config" "Set audio control system" \
+      "A10 libliftoff" "Enable/disable hardware overlays with libliftoff (experimental)" \
       3>&1 1>&2 2>&3)
   fi
   RET=$?
@@ -3875,6 +3936,7 @@ do_advanced_menu() {
       A7\ *) do_audioconf ;;
       A8\ *) do_pci ;;
       A9\ *) do_network_install_ui ;;
+      A10\ *) do_libliftoff ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
