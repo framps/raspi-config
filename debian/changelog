@@ -1,3 +1,140 @@
+raspi-config (20241210) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Add option to set output for onscreen keyboard
+
+ -- Simon Long <simon@raspberrypi.com>  Tue, 10 Dec 2024 11:47:27 +0000
+
+raspi-config (20241202) bookworm; urgency=medium
+
+  [ Richard Oliver ]
+  * Add 'Logging' to 'System Options' (#262)
+  * init: Remove 'shift' key cpu governor behaviour
+
+ -- Serge Schneider <serge@raspberrypi.com>  Mon, 02 Dec 2024 08:41:05 +0000
+
+raspi-config (20241129) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Correctly set ownership of labwc file
+
+ -- Simon Long <simon@raspberrypi.com>  Fri, 29 Nov 2024 10:21:38 +0000
+
+raspi-config (20241128) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Write labwc keymap to user file, not system global
+
+ -- Simon Long <simon@raspberrypi.com>  Thu, 28 Nov 2024 13:50:31 +0000
+
+raspi-config (20241119) bookworm; urgency=medium
+
+  * do_wifi_country: Update NM state file if NM service if not running
+  * do_boot_behaviour: check for existance of autologin.conf before deleting it
+    and parent directory
+
+ -- Serge Schneider <serge@raspberrypi.com>  Tue, 19 Nov 2024 13:14:05 +0000
+
+raspi-config (20241111) bookworm; urgency=medium
+
+  * autologin: ensure drop-in directory exists, remove when not needed
+
+ -- Serge Schneider <serge@raspberrypi.com>  Mon, 11 Nov 2024 13:48:55 +0000
+
+raspi-config (20241105) bookworm; urgency=medium
+
+  [ Tim Gover ]
+  * Add option to control when network install UI is displayed
+  * Pick latest firmware by default
+  * Improve bootloader version checks
+
+ -- Simon Long <simon@raspberrypi.com>  Tue, 05 Nov 2024 10:21:01 +0000
+
+raspi-config (20241030) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Make blanking control files owned by user
+
+ -- Simon Long <simon@raspberrypi.com>  Wed, 30 Oct 2024 09:13:27 +0000
+
+raspi-config (20241029) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Use dconf system defaults for Squeekboard layout 
+
+ -- Simon Long <simon@raspberrypi.com>  Tue, 29 Oct 2024 11:54:04 +0000
+
+raspi-config (20241028) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Add Squeekboard layout setting
+
+ -- Simon Long <simon@raspberrypi.com>  Mon, 28 Oct 2024 07:30:02 +0000
+
+raspi-config (20241025) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Add check for CM5
+
+ -- Simon Long <simon@raspberrypi.com>  Fri, 25 Oct 2024 12:42:47 +0100
+
+raspi-config (20241017) bookworm; urgency=medium
+
+  [ Paul Mucur ]
+  * Update version check for rpi-connect
+
+ -- Simon Long <simon@raspberrypi.com>  Thu, 17 Oct 2024 11:27:16 +0100
+
+raspi-config (20241016) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Use rpi-connect CLI to enable and disable
+
+ -- Simon Long <simon@raspberrypi.com>  Wed, 16 Oct 2024 07:28:19 +0100
+
+raspi-config (20241014) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * New control logic for Raspberry Pi Connect
+
+ -- Simon Long <simon@raspberrypi.com>  Mon, 14 Oct 2024 10:01:17 +0100
+
+raspi-config (20240923) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Use global environment file for labwc keyboard settings
+  * Add auto detect option for squeekboard
+
+ -- Simon Long <simon@raspberrypi.com>  Mon, 23 Sep 2024 13:26:40 +0100
+
+raspi-config (20240918) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Check labwc autostart file exists before trying to edit it
+
+ -- Simon Long <simon@raspberrypi.com>  Wed, 18 Sep 2024 07:55:09 +0100
+
+raspi-config (20240917) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Update name of Chromium package
+
+ -- Simon Long <simon@raspberrypi.com>  Tue, 17 Sep 2024 13:57:24 +0100
+
+raspi-config (20240802) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Create labwc config directory when enabling screen blanking
+
+ -- Simon Long <simon@raspberrypi.com>  Fri, 02 Aug 2024 14:22:31 +0100
+
+raspi-config (20240715) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Add squeekboard switching
+
+ -- Simon Long <simon@raspberrypi.com>  Mon, 15 Jul 2024 13:02:39 +0100
+
 raspi-config (20240708) bookworm; urgency=medium
 
   [ Paul Mucur ]

@@ -95,6 +95,11 @@ is_pifive() {
   return $?
 }
 
+is_cmfive() {
+  grep -q "^Revision\s*:\s*[ 123][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]1[8aA][0-9a-fA-F]$" /proc/cpuinfo
+  return $?
+}
+
 get_pi_type() {
   if is_pione; then
     echo 1
@@ -534,8 +539,8 @@ do_blanking() {
         if grep -q "\[idle\]" $WAYFIRE_FILE ; then
           sed -i 's/\[idle]/[idle]\ndpms_timeout=600/' $WAYFIRE_FILE
         else
-          echo '\n[idle]' >> $WAYFIRE_FILE
-          echo 'dpms_timeout=600' >> $WAYFIRE_FILE
+          echo '\n[idle]\ndpms_timeout=600' >> $WAYFIRE_FILE
+          chown $USER:$USER $WAYFIRE_FILE
         fi
       fi
       STATUS=enabled
@@ -546,8 +551,8 @@ do_blanking() {
         if grep -q "\[idle\]" $WAYFIRE_FILE ; then
           sed -i 's/\[idle]/[idle]\ndpms_timeout=-1/' $WAYFIRE_FILE
         else
-          echo '\n[idle]' >> $WAYFIRE_FILE
-          echo 'dpms_timeout=-1' >> $WAYFIRE_FILE
+          echo '\n[idle]\ndpms_timeout=-1' >> $WAYFIRE_FILE
+          chown $USER:$USER $WAYFIRE_FILE
         fi
       fi
       STATUS=disabled
@@ -564,11 +569,16 @@ do_blanking() {
     if [ "$RET" -eq "$CURRENT" ]; then
       ASK_TO_REBOOT=1
     fi
+    mkdir -p "$HOMEDIR/.config/labwc/"
+    chown -R $USER:$USER "$HOMEDIR/.config/labwc/"
     if [ "$RET" -eq 0 ] ; then
       echo "swayidle -w timeout 600 'wlopm --off \\*' resume 'wlopm --on \\*' &" >> $LABWCAST_FILE
+      chown $USER:$USER $LABWCAST_FILE
       STATUS=enabled
     elif [ "$RET" -eq 1 ]; then
-      sed -i '/swayidle/d' $LABWCAST_FILE
+      if [ -e $LABWCAST_FILE ] ; then
+        sed -i '/swayidle/d' $LABWCAST_FILE
+      fi
       STATUS=disabled
     else
       return "$RET"
@@ -576,7 +586,7 @@ do_blanking() {
   else
     if [ "$INTERACTIVE" = True ]; then
       if [ "$(dpkg -l xscreensaver | tail -n 1 | cut -d ' ' -f 1)" = "ii" ]; then
-        whiptail --msgbox "Warning: xscreensaver is installed may override raspi-config settings" 20 60 2
+        whiptail --msgbox "Warning: xscreensaver is installed and may override raspi-config settings" 20 60 2
       fi
       whiptail --yesno "Would you like to enable screen blanking?" $DEFAULT 20 60 2
       RET=$?
@@ -625,7 +635,7 @@ update_wayfire_keyboard() {
       install -o "$USER" -g "$USER" -d "$CONFIG_DIR"
     fi
     cp /etc/wayfire/template.ini $UFILE
-    chown -R $USER:$USER $UFILE
+    chown $USER:$USER $UFILE
   fi
   if [ -e $UFILE ] ; then
     grep -q "\\[input\\]" $UFILE || printf "\n[input]" >> $UFILE
@@ -648,41 +658,87 @@ update_wayfire_keyboard() {
 }
 
 update_labwc_keyboard() {
-  if ! is_labwc ; then
-    return
-  fi
   MODEL=$(grep XKBMODEL /etc/default/keyboard | cut -d= -f2 | tr -d '"')
   LAYOUT=$(grep XKBLAYOUT /etc/default/keyboard | cut -d= -f2 | tr -d '"')
   VARIANT=$(grep XKBVARIANT /etc/default/keyboard | cut -d= -f2 | tr -d '"')
   OPTIONS=$(grep XKBOPTIONS /etc/default/keyboard | cut -d= -f2 | tr -d '"')
   UFILE=$LABWCENV_FILE
-  if [ ! -e $UFILE ] ; then
-    CONFIG_DIR="$(dirname "$UFILE")"
-    if ! [ -d "$CONFIG_DIR" ]; then
-      install -o "$USER" -g "$USER" -d "$CONFIG_DIR"
-    fi
-    touch $UFILE
-    chown -R $USER:$USER $UFILE
-  fi
+  mkdir -p "$HOMEDIR/.config/labwc/"
+  chown -R $USER:$USER "$HOMEDIR/.config/labwc/"
   if [ -e $UFILE ] ; then
     if grep -q XKB_DEFAULT_MODEL $UFILE ; then sed -i s/XKB_DEFAULT_MODEL.*/XKB_DEFAULT_MODEL=$MODEL/ $UFILE ; else echo XKB_DEFAULT_MODEL=$MODEL >> $UFILE ; fi
     if grep -q XKB_DEFAULT_LAYOUT $UFILE ; then sed -i s/XKB_DEFAULT_LAYOUT.*/XKB_DEFAULT_LAYOUT=$LAYOUT/ $UFILE ; else echo XKB_DEFAULT_LAYOUT=$LAYOUT >> $UFILE ; fi
     if grep -q XKB_DEFAULT_VARIANT $UFILE ; then sed -i s/XKB_DEFAULT_VARIANT.*/XKB_DEFAULT_VARIANT=$VARIANT/ $UFILE ; else echo XKB_DEFAULT_VARIANT=$VARIANT >> $UFILE ; fi
     if grep -q XKB_DEFAULT_OPTIONS $UFILE ; then sed -i s/XKB_DEFAULT_OPTIONS.*/XKB_DEFAULT_OPTIONS=$OPTIONS/ $UFILE ; else echo XKB_DEFAULT_OPTIONS=$OPTIONS >> $UFILE ; fi
+  else
+    echo XKB_DEFAULT_MODEL=$MODEL >> $UFILE
+    echo XKB_DEFAULT_LAYOUT=$LAYOUT >> $UFILE
+    echo XKB_DEFAULT_VARIANT=$VARIANT >> $UFILE
+    echo XKB_DEFAULT_OPTIONS=$OPTIONS >> $UFILE
   fi
+  chown $USER:$USER $UFILE
   UFILE="/usr/share/labwc/environment"
-  if [ ! -e $UFILE ] ; then
-    CONFIG_DIR="$(dirname "$UFILE")"
-    mkdir -p "$CONFIG_DIR"
-    touch $UFILE
-  fi
   if [ -e $UFILE ] ; then
     if grep -q XKB_DEFAULT_MODEL $UFILE ; then sed -i s/XKB_DEFAULT_MODEL.*/XKB_DEFAULT_MODEL=$MODEL/ $UFILE ; else echo XKB_DEFAULT_MODEL=$MODEL >> $UFILE ; fi
     if grep -q XKB_DEFAULT_LAYOUT $UFILE ; then sed -i s/XKB_DEFAULT_LAYOUT.*/XKB_DEFAULT_LAYOUT=$LAYOUT/ $UFILE ; else echo XKB_DEFAULT_LAYOUT=$LAYOUT >> $UFILE ; fi
     if grep -q XKB_DEFAULT_VARIANT $UFILE ; then sed -i s/XKB_DEFAULT_VARIANT.*/XKB_DEFAULT_VARIANT=$VARIANT/ $UFILE ; else echo XKB_DEFAULT_VARIANT=$VARIANT >> $UFILE ; fi
     if grep -q XKB_DEFAULT_OPTIONS $UFILE ; then sed -i s/XKB_DEFAULT_OPTIONS.*/XKB_DEFAULT_OPTIONS=$OPTIONS/ $UFILE ; else echo XKB_DEFAULT_OPTIONS=$OPTIONS >> $UFILE ; fi
   fi
-  kill -HUP `pgrep labwc`  # does the equivalent of labwc --reconfigure, but works as sudo...
+  if is_labwc ; then
+    kill -HUP `pgrep -x labwc`  # does the equivalent of labwc --reconfigure, but works as sudo...
+  fi
+}
+
+update_squeekboard() {
+  PREFIX=""
+  if [ -n "$SUDO_USER" ] ; then
+    PREFIX="sudo -u $USER XDG_RUNTIME_DIR=/run/user/$SUDO_UID DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$SUDO_UID/bus "
+  fi
+  LAYOUT1=$(grep XKBLAYOUT /etc/default/keyboard | cut -d= -f2 | tr -d '"' | cut -d, -f1)
+  VARIANT1=$(grep XKBVARIANT /etc/default/keyboard | cut -d= -f2 | tr -d '"' | cut -d, -f1)
+  LAYOUT2=$(grep XKBLAYOUT /etc/default/keyboard | cut -d= -f2 | tr -d '"' | cut -d, -f2 -s)
+  VARIANT2=$(grep XKBVARIANT /etc/default/keyboard | cut -d= -f2 | tr -d '"' | cut -d, -f2 -s)
+  GSET="[('xkb', '$LAYOUT1"
+  if [ -z "$VARIANT1" ] ; then
+    GSET=$GSET"')"
+  else
+    GSET=$GSET"+$VARIANT1')"
+  fi
+  if ! [ -z "$LAYOUT2" ] ; then
+    GSET=$GSET", ('xkb', '$LAYOUT2"
+    if [ -z "$VARIANT2" ] ; then
+      GSET=$GSET"')"
+    else
+      GSET=$GSET"+$VARIANT2')"
+    fi
+  fi
+  GSET=$GSET"]"
+  if ! [ -e /etc/dconf/profile/user ] ; then
+    mkdir -p "/etc/dconf/profile/"
+    echo "user-db:user\nsystem-db:local" >> /etc/dconf/profile/user
+  fi
+  FILE=/etc/dconf/db/local.d/00_keyboard
+  if [ -e $FILE ] ; then
+    if grep -q "^sources" $FILE ; then
+      sed $FILE -i -e "s/^sources=.*/sources=$GSET/"
+    else
+      if grep -q "\[org/gnome/desktop/input-sources\]" $FILE ; then
+        sed $FILE -i -e "s#\[org/gnome/desktop/input-sources\]#\[org/gnome/desktop/input-sources\]\nsources=$GSET#" 
+      else
+        echo "[org/gnome/desktop/input-sources]\nsources=$GSET" >> $FILE
+      fi
+    fi
+  else
+    mkdir -p "/etc/dconf/db/local.d/"
+    echo "[org/gnome/desktop/input-sources]\nsources=$GSET" > $FILE
+  fi
+  dconf update
+  if [ "$1" = restart ] ; then
+    if pgrep squeekboard > /dev/null ; then
+      pkill squeekboard
+      $PREFIX squeekboard > /dev/null 2> /dev/null &
+    fi
+  fi
 }
 
 do_configure_keyboard() {
@@ -697,6 +753,7 @@ do_configure_keyboard() {
   fi
   update_wayfire_keyboard
   update_labwc_keyboard
+  update_squeekboard restart
   if [ "$INIT" = "systemd" ]; then
     systemctl restart keyboard-setup
   fi
@@ -712,6 +769,7 @@ do_change_keyboard_rc_gui () {
   grep -q XKBOPTIONS /etc/default/keyboard && sed -i "s/XKBOPTIONS=.*/XKBOPTIONS=\"$4\"/g" /etc/default/keyboard || echo "XKBOPTIONS=\"$4\"" >> /etc/default/keyboard
   update_wayfire_keyboard
   update_labwc_keyboard
+  update_squeekboard restart
   if ! is_wayland ; then
     invoke-rc.d keyboard-setup start
   fi
@@ -841,6 +899,9 @@ do_wifi_country() {
     nmcli radio wifi on
   elif hash rfkill 2> /dev/null; then
     rfkill unblock wifi
+    if [ -f /var/lib/NetworkManager/NetworkManager.state ]; then
+      sed -i 's/^WirelessEnabled=.*/WirelessEnabled=true/' /var/lib/NetworkManager/NetworkManager.state
+    fi
   fi
   if is_pi; then
     for filename in /var/lib/systemd/rfkill/*:wlan ; do
@@ -1116,47 +1177,66 @@ do_rpi_connect() {
   if [ -n "$SUDO_USER" ] ; then
     PREFIX="sudo -u $USER XDG_RUNTIME_DIR=/run/user/$SUDO_UID DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$SUDO_UID/bus "
   fi
-  DEFAULT=--defaultno
-  if [ $(get_rpi_connect) -eq 0 ]; then
-    DEFAULT=
-  fi
   APT_GET_FLAGS=""
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --yesno "Would you like Raspberry Pi Connect to be enabled?" $DEFAULT 20 60 2
+    whiptail --yesno "Would you like to enable screen sharing over Raspberry Pi Connect?" --defaultno 20 60 2
     RET=$?
   else
     APT_GET_FLAGS="-y"
     RET=$1
   fi
+  rpi_connect_version="$(get_package_version rpi-connect)"
   if [ $RET -eq 0 ]; then
     if is_installed rpi-connect || apt-get install "$APT_GET_FLAGS" rpi-connect; then
-      rpi_connect_version="$(get_package_version rpi-connect)"
       if dpkg --compare-versions "$rpi_connect_version" lt 1.3; then
-        systemctl --global -q enable rpi-connect.service rpi-connect-wayvnc.service
-        $PREFIX systemctl --global -q start rpi-connect.service rpi-connect-wayvnc.service
+        $PREFIX systemctl --user -q enable rpi-connect.service rpi-connect-wayvnc.service
+        $PREFIX systemctl --user -q start rpi-connect.service rpi-connect-wayvnc.service
+      elif dpkg --compare-versions "$rpi_connect_version" lt 2.0; then
+        $PREFIX systemctl --user -q enable rpi-connect.service rpi-connect-wayvnc.service rpi-connect-wayvnc-watcher.path
+        $PREFIX systemctl --user -q start rpi-connect.service
       else
-        systemctl --global -q enable rpi-connect.service rpi-connect-wayvnc.service rpi-connect-wayvnc-watcher.path
-        $PREFIX systemctl --global -q start rpi-connect.service
+        $PREFIX rpi-connect on > /dev/null 2>&1
       fi
-      STATUS=enabled
+      STATUS="Screen sharing via Raspberry Pi Connect is enabled"
     else
       return 1
     fi
   elif [ $RET -eq 1 ]; then
-    rpi_connect_version="$(get_package_version rpi-connect)"
-    if dpkg --compare-versions "$rpi_connect_version" lt 1.3; then
-      $PREFIX systemctl --global -q stop rpi-connect.service rpi-connect-wayvnc.service
-      systemctl --global -q disable rpi-connect-wayvnc.service rpi-connect.service
-    else
-      $PREFIX systemctl --global -q stop rpi-connect.service
-      systemctl --global -q disable rpi-connect.service rpi-connect-wayvnc.service rpi-connect-wayvnc-watcher.path
+    if [ "$INTERACTIVE" = True ]; then
+      whiptail --yesno "Would you like to enable remote shell access over Raspberry Pi Connect?" --defaultno 20 60 2
+      RET=$?
     fi
-    STATUS=disabled
+    if [ $RET -eq 0 ]; then
+      if is_installed rpi-connect || is_installed rpi-connect-lite || apt-get install "$APT_GET_FLAGS" rpi-connect-lite; then
+        if dpkg --compare-versions "$rpi_connect_version" lt 2.0; then
+          $PREFIX systemctl --user -q enable rpi-connect.service
+          $PREFIX systemctl --user -q start rpi-connect.service
+        else
+          $PREFIX rpi-connect on > /dev/null 2>&1
+        fi
+        STATUS="Remote shell access via Raspberry Pi Connect is enabled"
+      else
+        return 1
+      fi
+    elif [ $RET -eq 1 ]; then
+      if dpkg --compare-versions "$rpi_connect_version" lt 1.3; then
+        $PREFIX systemctl --user -q stop rpi-connect.service rpi-connect-wayvnc.service
+        $PREFIX systemctl --user -q disable rpi-connect-wayvnc.service rpi-connect.service
+      elif dpkg --compare-versions "$rpi_connect_version" lt 2.0; then
+        $PREFIX systemctl --user -q stop rpi-connect.service
+        $PREFIX systemctl --user -q disable rpi-connect.service rpi-connect-wayvnc.service rpi-connect-wayvnc-watcher.path
+      else
+        $PREFIX rpi-connect off > /dev/null 2>&1
+      fi
+      STATUS="Raspberry Pi Connect is disabled"
+    else
+      return $RET
+    fi
   else
     return $RET
   fi
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --msgbox "Raspberry Pi Connect is $STATUS" 20 60 1
+    whiptail --msgbox "$STATUS" 20 60 1
   fi
 }
 
@@ -1736,7 +1816,7 @@ do_browser() {
   fi
   if [ $? -eq 0 ]; then
     if [ "$RES" = "1" ] ; then
-      BROWSER="chromium-browser"
+      BROWSER="chromium"
       BSTRING="Chromium"
     elif [ "$RES" = "2" ] ; then
       BROWSER="firefox"
@@ -1750,6 +1830,40 @@ do_browser() {
     fi
     if [ "$INTERACTIVE" = True ]; then
       whiptail --msgbox "Default browser set to $BSTRING" 20 60 1
+    fi
+  fi
+}
+
+do_journald_storage() {
+  if [ "$INTERACTIVE" = True ]; then
+    RES=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Select Log Location" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+      "1" "Default" \
+      "2" "Volatile" \
+      "3" "Persistent" \
+      "4" "Auto" \
+      "5" "None" \
+      3>&1 1>&2 2>&3)
+  else
+    RES=""
+    true
+  fi
+  if [ $? -eq 0 ]; then
+    case $RES in
+      2) JSTRING="volatile"
+      ;;
+      3) JSTRING="persistent"
+      ;;
+      4) JSTRING="auto"
+      ;;
+      5) JSTRING="none"
+      ;;
+      *) JSTRING=""
+      ;;
+    esac
+    REPLACEMENT="$([ ! -z $JSTRING ] && echo "Storage=$JSTRING" || echo "#Storage=auto")"
+    sed --in-place -E "s/^#?Storage=.*/${REPLACEMENT}/" /etc/systemd/journald.conf
+    if [ "$INTERACTIVE" = True ]; then
+      whiptail --msgbox "Logging location set to ${JSTRING:-default}" 20 60 1
     fi
   fi
 }
@@ -1789,12 +1903,16 @@ do_boot_behaviour() {
         if [ -z "${BOOTOPT%%B3*}" ]; then
           sed /etc/lightdm/lightdm.conf -i -e "s/^autologin-user=.*/#autologin-user=/"
         fi
-        rm -f /etc/systemd/system/getty@tty1.service.d/autologin.conf
+        if [ -f /etc/systemd/system/getty@tty1.service.d/autologin.conf ]; then
+          rm -f /etc/systemd/system/getty@tty1.service.d/autologin.conf
+          rmdir --ignore-fail-on-non-empty /etc/systemd/system/getty@tty1.service.d
+        fi
         ;;
       B2*|B4*) # Autologin enabled
         if [ -z "${BOOTOPT%%B4*}" ]; then
           sed /etc/lightdm/lightdm.conf -i -e "s/^\(#\|\)autologin-user=.*/autologin-user=$USER/"
         fi
+        mkdir -p /etc/systemd/system/getty@tty1.service.d
         cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf << EOF
 [Service]
 ExecStart=
@@ -1809,6 +1927,76 @@ EOF
   fi
 }
 
+get_bootloader_filename() {
+   CURDATE=$(date -d "$(vcgencmd bootloader_version |  head -n 1)" +%Y%m%d)
+   FILNAME=""
+   EEBASE=$(rpi-eeprom-update | grep RELEASE | sed 's/.*(//g' | sed 's/[^\/]*)//g')
+   if grep FIRMWARE_RELEASE_STATUS /etc/default/rpi-eeprom-update | egrep -Eq "stable|latest"; then
+      EEPATH="${EEBASE}/latest/pieeprom*.bin"
+   else
+      EEPATH="${EEBASE}/default/pieeprom*.bin"
+   fi
+   EXACT_MATCH=0
+   for filename in $(find $EEPATH -name "pieeprom*.bin" 2>/dev/null | sort); do
+      FILDATE=$(date -d "$(echo $filename | sed 's/.*\///g' | cut -d - -f 2- | cut -d . -f 1)" +%Y%m%d)
+      FILNAME=$filename
+      if [ $FILDATE -eq $CURDATE ]; then
+         EXACT_MATCH=1
+         break
+      fi
+   done
+   if [ $EXACT_MATCH != 1 ]; then
+      if [ "$INTERACTIVE" = True ]; then
+         whiptail --yesno "Current EEPROM version $(date -d $CURDATE +%Y-%m-%d) or newer not found.\n\nTry updating the rpi-eeprom APT package.\n\nInstall latest local $(basename $FILNAME) anyway?" 20 70 3
+         DEFAULTS=$?
+         if [ "$DEFAULTS" -ne 0 ]; then
+            FILNAME="none" # no
+         fi
+      fi
+   fi
+}
+
+do_network_install_ui() {
+  if [ "$INTERACTIVE" = True ]; then
+    BOOTOPT=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Bootloader network install UI" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+      "B1 Always" "Always display the UI for a few seconds after power on." \
+      "B2 On demand" "Display the UI if the SHIFT key is presssed or if an error occurs." \
+      3>&1 1>&2 2>&3)
+  else
+    BOOTOPT=$1
+    true
+  fi
+
+  if [ $? -eq 0 ]; then
+    get_bootloader_filename
+    if [ "${FILNAME}" = "none" ]; then
+       if [ "$INTERACTIVE" = True ]; then
+          return 0
+       else
+          return 1
+       fi
+    fi
+    EECFG=$(mktemp)
+    rpi-eeprom-config > $EECFG
+    sed $EECFG -i -e "/NET_INSTALL_AT_POWER_ON/d"
+    case "$BOOTOPT" in
+      B1*)
+         echo "NET_INSTALL_AT_POWER_ON=1" >> $EECFG
+         ;;
+      B2*)
+         # NET_INSTALL_AT_POWER_ON default value is 0
+         true
+         ;;
+      *)
+        whiptail --msgbox "Programmer error, unrecognised boot option" 20 60 2
+        return 1
+        ;;
+    esac
+    rpi-eeprom-config --apply $EECFG $FILNAME
+    ASK_TO_REBOOT=1
+  fi
+ }
+
 do_boot_order() {
   if [ "$INTERACTIVE" = True ]; then
     BOOTOPT=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Boot Device Order" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
@@ -1821,30 +2009,6 @@ do_boot_order() {
     true
   fi
   if [ $? -eq 0 ]; then
-    CURDATE=$(date -d "$(vcgencmd bootloader_version |  head -n 1)" +%Y%m%d)
-    FILNAME="none"
-    EEBASE=$(rpi-eeprom-update | grep RELEASE | sed 's/.*(//g' | sed 's/[^\/]*)//g')
-    if grep FIRMWARE_RELEASE_STATUS /etc/default/rpi-eeprom-update | egrep -Eq "stable|latest"; then
-      EEPATH="${EEBASE}/latest/pieeprom*.bin"
-    else
-      EEPATH="${EEBASE}/default/pieeprom*.bin"
-    fi
-    for filename in $(find $EEPATH -name "pieeprom*.bin" 2>/dev/null | sort); do
-      FILDATE=$(date -d "$(echo $filename | sed 's/.*\///g' | cut -d - -f 2- | cut -d . -f 1)" +%Y%m%d)
-      if [ $FILDATE -eq $CURDATE ]; then
-        FILNAME=$filename
-        break
-      elif [ "$FILDATE" ">" "$CURDATE" ]; then
-        # If there is no exact match then try an upgrade
-        FILNAME=$filename
-      fi
-    done
-    if [ "$FILNAME" = "none" ]; then
-      if [ "$INTERACTIVE" = True ]; then
-        whiptail --msgbox "Current EEPROM version $(date -d $CURDATE +%Y-%m-%d) or newer not found - aborting.\n\nTry updating the rpi-eeprom APT package." 20 70 2
-      fi
-      return 1
-    fi
     EECFG=$(mktemp)
     rpi-eeprom-config > $EECFG
     sed $EECFG -i -e "/SD_BOOT_MAX_RETRIES/d"
@@ -1889,6 +2053,14 @@ do_boot_order() {
         return 1
         ;;
     esac
+    get_bootloader_filename
+    if [ "${FILNAME}" = "none" ]; then
+       if [ "$INTERACTIVE" = True ]; then
+          return 0
+       else
+          return 1
+       fi
+    fi
     rpi-eeprom-config --apply $EECFG $FILNAME
     ASK_TO_REBOOT=1
     if [ "$INTERACTIVE" = True ]; then
@@ -1930,26 +2102,19 @@ do_boot_rom() {
       DEFAULTS=$2
     fi
     if [ "$DEFAULTS" -eq 0 ]; then # yes
-      EEBASE=$(rpi-eeprom-update | grep RELEASE | sed 's/.*(//g' | sed 's/[^\/]*)//g')
-      if grep FIRMWARE_RELEASE_STATUS /etc/default/rpi-eeprom-update | egrep -Eq "stable|latest"; then
-        EEPATH="${EEBASE}/latest/"
-      else
-        EEPATH="${EEBASE}/default/"
+      get_bootloader_filename
+      if [ "${FILNAME}" = "none" ]; then
+         if [ "$INTERACTIVE" = True ]; then
+            return 0
+         else
+            return 1
+         fi
       fi
-      MATCH=".*/pieeprom-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].bin"
-      FILNAME="$(find "${EEPATH}" -maxdepth 1 -type f -regex "${MATCH}" | sort -r | head -n1)"
-      if [ -z "$FILNAME" ]; then
-        if [ "$INTERACTIVE" = True ]; then
-          whiptail --msgbox "No EEPROM bin file found - cannot reset to defaults,\n\nTry updating APT rpi-eeprom package and selecting the latest release." 20 60 2
-        fi
-      else
-        rpi-eeprom-update -d -f $FILNAME
-        if [ "$INTERACTIVE" = True ]; then
-          whiptail --msgbox "Bootloader reset to default configuration" 20 60 2
-        fi
+      rpi-eeprom-update -d -f $FILNAME
+      if [ "$INTERACTIVE" = True ]; then
+         whiptail --msgbox "Bootloader reset to default configuration" 20 60 2
       fi
     else
-      rpi-eeprom-update
       if [ "$INTERACTIVE" = True ]; then
         whiptail --msgbox "Bootloader not reset to defaults" 20 60 2
       fi
@@ -3275,57 +3440,131 @@ do_usb_current() {
 }
 
 get_squeekboard() {
-  if [ -e /etc/xdg/autostart/squeekboard.desktop ] ; then
-    echo 0
+  if ! is_installed squeekboard ; then
+    echo 2
+  elif [ -e /etc/xdg/autostart/squeekboard.desktop ] ; then
+    if grep -q sbtest /etc/xdg/autostart/squeekboard.desktop ; then
+      echo 1
+    else
+      echo 0
+    fi
   else
-    echo 1
+    echo 2
   fi
 }
 
 do_squeekboard() {
-  DEFAULT=--defaultno
-  if [ $(get_squeekboard) -eq 0 ]; then
-    DEFAULT=
-  fi
   if [ "$INTERACTIVE" = True ]; then
-    whiptail --yesno "Would you like the on-screen keyboard to be enabled?" $DEFAULT 20 60 2
-    RET=$?
+    OPT=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "On-screen Keyboard" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+      "S1 Always On" "On-screen keyboard always enabled" \
+      "S2 Autodetect" "On-screen keyboard enabled if touch device found" \
+      "S3 Always Off" "On-screen keyboard disabled" \
+      3>&1 1>&2 2>&3)
   else
-    RET=$1
+    OPT=$1
+    true
   fi
-  if [ $RET -eq 0 ]; then
-    is_installed squeekboard || apt-get install -y squeekboard
-    cat > /etc/xdg/autostart/squeekboard.desktop << EOF
+  case "$OPT" in
+    S1*)
+      is_installed squeekboard || apt-get install -y squeekboard
+      cat > /etc/xdg/autostart/squeekboard.desktop << EOF
 [Desktop Entry]
 Name=Squeekboard
 Comment=Launch the on-screen keyboard
-Exec=/usr/bin/squeekboard
+Exec=/usr/bin/sbout
 Terminal=false
 Type=Application
 NoDisplay=true
 EOF
-    if ! grep -q squeekboard /usr/share/labwc/autostart ; then
-      echo "/usr/bin/squeekboard &" >> /usr/share/labwc/autostart
-    fi
-    PREFIX=""
-    if [ -n "$SUDO_USER" ] ; then
-      PREFIX="sudo -u $USER XDG_RUNTIME_DIR=/run/user/$SUDO_UID DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$SUDO_UID/bus "
-    fi
-    $PREFIX squeekboard > /dev/null 2> /dev/null &
-    STATUS=enabled
-  elif [ $RET -eq 1 ]; then
-    pkill squeekboard
-    rm -f /etc/xdg/autostart/squeekboard.desktop
-    sed -i '/squeekboard/d' /usr/share/labwc/autostart
-    STATUS=disabled
-  else
-    return $RET
-  fi
+      sed -i '/sbtest/d' /usr/share/labwc/autostart
+      if ! grep -q sbout /usr/share/labwc/autostart ; then
+        echo "/usr/bin/sbout &" >> /usr/share/labwc/autostart
+      fi
+      PREFIX=""
+      if [ -n "$SUDO_USER" ] ; then
+        PREFIX="sudo -u $USER XDG_RUNTIME_DIR=/run/user/$SUDO_UID DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$SUDO_UID/bus "
+      fi
+      $PREFIX sbout > /dev/null 2> /dev/null &
+      STATUS="enabled"
+      ;;
+    S2*)
+      is_installed squeekboard || apt-get install -y squeekboard
+      cat > /etc/xdg/autostart/squeekboard.desktop << EOF
+[Desktop Entry]
+Name=Squeekboard
+Comment=Launch the on-screen keyboard
+Exec=/usr/bin/sbtest
+Terminal=false
+Type=Application
+NoDisplay=true
+EOF
+      sed -i '/sbout/d' /usr/share/labwc/autostart
+      if ! grep -q sbtest /usr/share/labwc/autostart ; then
+        echo "/usr/bin/sbtest &" >> /usr/share/labwc/autostart
+      fi
+      PREFIX=""
+      if [ -n "$SUDO_USER" ] ; then
+        PREFIX="sudo -u $USER XDG_RUNTIME_DIR=/run/user/$SUDO_UID DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$SUDO_UID/bus "
+      fi
+      pkill squeekboard
+      $PREFIX sbtest > /dev/null 2> /dev/null &
+      STATUS="using autodetect"
+      ;;
+    S3*)
+      pkill squeekboard
+      rm -f /etc/xdg/autostart/squeekboard.desktop
+      sed -i '/sbout/d' /usr/share/labwc/autostart
+      sed -i '/sbtest/d' /usr/share/labwc/autostart
+      STATUS="disabled"
+      ;;
+    *)
+      return $OPT
+      ;;
+  esac
   if [ "$INTERACTIVE" = True ]; then
     whiptail --msgbox "The onscreen keyboard is $STATUS" 20 60 1
   fi
 }
 
+get_squeek_output (){
+  if [ -e /usr/share/squeekboard/output ] ; then
+    echo `grep SQUEEKBOARD_PREFERRED_OUTPUT /usr/share/squeekboard/output | cut -d = -f 2`
+  else
+    echo ""
+  fi
+}
+
+do_squeek_output() {
+  PREFIX=""
+  if [ -n "$SUDO_USER" ] ; then
+    PREFIX="sudo -u $USER XDG_RUNTIME_DIR=/run/user/$SUDO_UID DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$SUDO_UID/bus "
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    menu=$($PREFIX wlr-randr | grep -v ^' ' | cut -d ' ' -f 1 | tr '\n' '/' | sed 's#/#//#g')
+    oIFS="$IFS"
+    IFS="/"
+    OPT=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Select where the on-screen keyboard is to be shown" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+      ${menu} \
+      3>&1 1>&2 2>&3)
+    IFS="$oIFS"
+  else
+    OPT=$1
+    true
+  fi
+  mkdir -p /usr/share/squeekboard/
+  echo "#!/bin/sh\nexport SQUEEKBOARD_PREFERRED_OUTPUT=$OPT" > /usr/share/squeekboard/output
+  chmod a+x /usr/share/squeekboard/output
+  if pgrep sbtest > /dev/null ; then
+    pkill squeekboard
+    $PREFIX sbtest > /dev/null 2> /dev/null &
+  elif pgrep squeekboard > /dev/null ; then
+    pkill squeekboard
+    $PREFIX sbout > /dev/null 2> /dev/null &
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The onscreen keyboard is on $OPT" 20 60 1
+  fi
+}
 
 nonint() {
   "$@"
@@ -3360,6 +3599,7 @@ do
     ;;
   nonint)
     INTERACTIVE=False
+    #echo "$@"
     "$@"
     exit $?
     ;;
@@ -3399,6 +3639,7 @@ do_system_menu() {
       "S6 Splash Screen" "Choose graphical splash screen or text boot" \
       "S7 Power LED" "Set behaviour of power LED" \
       "S8 Browser" "Choose default web browser" \
+      "S9 Logging" "Set storage location for logs" \
       3>&1 1>&2 2>&3)
   elif is_live ; then
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "System Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -3429,6 +3670,7 @@ do_system_menu() {
       S6\ *) do_boot_splash ;;
       S7\ *) do_leds ;;
       S8\ *) do_browser ;;
+      S9\ *) do_journald_storage ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
@@ -3443,12 +3685,14 @@ do_display_menu() {
           "D4 Composite" "Enable/disable composite output" \
           "D5 4Kp60 HDMI" "Enable 4Kp60 resolution on HDMI0" \
           "D6 Onscreen Keyboard" "Enable on-screen keyboard" \
+          "D7 Keyboard Output" "Select monitor used for on-screen keyboard" \
           3>&1 1>&2 2>&3)
       else
         FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Display Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
           "D2 Screen Blanking" "Enable/disable screen blanking" \
           "D4 Composite" "Enable/disable composite output" \
           "D6 Onscreen Keyboard" "Enable on-screen keyboard" \
+          "D7 Keyboard Output" "Select monitor used for on-screen keyboard" \
           3>&1 1>&2 2>&3)
       fi
     else
@@ -3486,6 +3730,7 @@ do_display_menu() {
       D4\ *) do_composite ;;
       D5\ *) do_pi4video ;;
       D6\ *) do_squeekboard ;;
+      D7\ *) do_squeek_output ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
@@ -3590,6 +3835,7 @@ do_advanced_menu() {
       "A6 Wayland" "Switch between X and Wayland backends" \
       "A7 Audio Config" "Set audio control system" \
       "A8 PCIe Speed" "Set PCIe x1 port speed" \
+      "A9 Network install UI" "Select when to display the bootloader network-install UI" \
       3>&1 1>&2 2>&3)
   elif is_pi ; then
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -3620,6 +3866,7 @@ do_advanced_menu() {
       A6\ *) do_wayland ;;
       A7\ *) do_audioconf ;;
       A8\ *) do_pci ;;
+      A9\ *) do_network_install_ui ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
