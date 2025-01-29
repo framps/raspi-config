@@ -1,3 +1,22 @@
+raspi-config (20250129) bookworm; urgency=medium
+
+  [ Simon Long ]
+  * Add squeek output get function
+
+  [ Thomas Böhler ]
+  * fix: permission of created .config dir in labwc
+
+  [ David Turner ]
+  * Add libliftoff enable/disable option
+
+  [ timg236 ]
+  * bootloader: Add configuration for POWER_OFF_ON_HALT (#270)
+
+  [ Serge Schneider ]
+  * Remove no-response bot config
+
+ -- Serge Schneider <serge@raspberrypi.com>  Wed, 29 Jan 2025 17:27:43 +0000
+
 raspi-config (20241210) bookworm; urgency=medium
 
   [ Simon Long ]
