@@ -3942,14 +3942,14 @@ do_advanced_menu() {
       "A1 Expand Filesystem" "Ensures that all of the SD card is available" \
       "A2 Network Interface Names" "Enable/disable predictable network i/f names" \
       "A3 Network Proxy Settings" "Configure network proxy settings" \
-      "A4 Boot Order" "Choose SD, network, USB or NVMe device boot priority" \
-      "A5 Bootloader Version" "Select latest or factory default bootloader software" \
+      "A4 Boot Order" "Choose boot device priority (SD/net/USB/NVMe)" \
+      "A5 Bootloader Version" "Select bootloader (latest/factory default)" \
       "A6 Wayland" "Switch between X and Wayland backends" \
       "A7 Audio Config" "Set audio control system" \
       "A8 PCIe Speed" "Set PCIe x1 port speed" \
-      "A9 Network install UI" "Select when to display the bootloader network-install UI" \
-      "A10 libliftoff" "Enable/disable hardware overlays with libliftoff (experimental)" \
-      "A11 Shutdown behaviour" "Configure shutdown behavior" \
+      "A9 Network Install UI" "Select display of bootloader network install UI" \
+      "A10 Libliftoff" "Enable/disable libliftoff hardware overlays" \
+      "A11 Shutdown Behaviour" "Configure shutdown behavior" \
       3>&1 1>&2 2>&3)
   elif is_pi ; then
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -3958,7 +3958,7 @@ do_advanced_menu() {
       "A3 Network Proxy Settings" "Configure network proxy settings" \
       "A6 Wayland" "Switch between X and Wayland backends" \
       "A7 Audio Config" "Set audio control system" \
-      "A10 libliftoff" "Enable/disable hardware overlays with libliftoff (experimental)" \
+      "A10 Libliftoff" "Enable/disable libliftoff hardware overlays" \
       3>&1 1>&2 2>&3)
   else
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -3966,7 +3966,7 @@ do_advanced_menu() {
       "A3 Network Proxy Settings" "Configure network proxy settings" \
       "A6 Wayland" "Switch between X and Wayland backends" \
       "A7 Audio Config" "Set audio control system" \
-      "A10 libliftoff" "Enable/disable hardware overlays with libliftoff (experimental)" \
+      "A10 Libliftoff" "Enable/disable libliftoff hardware overlays" \
       3>&1 1>&2 2>&3)
   fi
   RET=$?
