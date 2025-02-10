@@ -685,7 +685,10 @@ update_labwc_keyboard() {
     echo XKB_DEFAULT_OPTIONS=$OPTIONS >> $UFILE
   fi
   chown $USER:$USER $UFILE
-  UFILE="/usr/share/labwc/environment"
+  UFILE="/etc/xdg/labwc-greeter/environment"
+  if [ ! -e $UFILE ] ; then
+    UFILE="/usr/share/labwc/environment"
+  fi
   if [ -e $UFILE ] ; then
     if grep -q XKB_DEFAULT_MODEL $UFILE ; then sed -i s/XKB_DEFAULT_MODEL.*/XKB_DEFAULT_MODEL=$MODEL/ $UFILE ; else echo XKB_DEFAULT_MODEL=$MODEL >> $UFILE ; fi
     if grep -q XKB_DEFAULT_LAYOUT $UFILE ; then sed -i s/XKB_DEFAULT_LAYOUT.*/XKB_DEFAULT_LAYOUT=$LAYOUT/ $UFILE ; else echo XKB_DEFAULT_LAYOUT=$LAYOUT >> $UFILE ; fi
@@ -3576,6 +3579,10 @@ do_squeekboard() {
     OPT=$1
     true
   fi
+  GFILE="/etc/xdg/labwc-greeter/autostart"
+  if [ ! -e $GFILE ] ; then
+    GFILE="/usr/share/labwc/autostart"
+  fi
   case "$OPT" in
     S1*)
       is_installed squeekboard || apt-get install -y squeekboard
@@ -3588,9 +3595,9 @@ Terminal=false
 Type=Application
 NoDisplay=true
 EOF
-      sed -i '/sbtest/d' /usr/share/labwc/autostart
-      if ! grep -q sbout /usr/share/labwc/autostart ; then
-        echo "/usr/bin/sbout &" >> /usr/share/labwc/autostart
+      sed -i '/sbtest/d' $GFILE
+      if ! grep -q sbout $GFILE ; then
+        echo "/usr/bin/sbout &" >> $GFILE
       fi
       PREFIX=""
       if [ -n "$SUDO_USER" ] ; then
@@ -3610,9 +3617,9 @@ Terminal=false
 Type=Application
 NoDisplay=true
 EOF
-      sed -i '/sbout/d' /usr/share/labwc/autostart
-      if ! grep -q sbtest /usr/share/labwc/autostart ; then
-        echo "/usr/bin/sbtest &" >> /usr/share/labwc/autostart
+      sed -i '/sbout/d' $GFILE
+      if ! grep -q sbtest $GFILE ; then
+        echo "/usr/bin/sbtest &" >> $GFILE
       fi
       PREFIX=""
       if [ -n "$SUDO_USER" ] ; then
@@ -3625,8 +3632,8 @@ EOF
     S3*)
       pkill squeekboard
       rm -f /etc/xdg/autostart/squeekboard.desktop
-      sed -i '/sbout/d' /usr/share/labwc/autostart
-      sed -i '/sbtest/d' /usr/share/labwc/autostart
+      sed -i '/sbout/d' $GFILE
+      sed -i '/sbtest/d' $GFILE
       STATUS="disabled"
       ;;
     *)
