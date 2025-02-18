@@ -386,6 +386,12 @@ end
 EOF
 }
 
+ensure_user_conf_dir() {
+  if [ ! -d "$HOMEDIR/.config" ]; then
+    install -d -o "$USER" -g "$USER" "$HOMEDIR/.config"
+  fi
+}
+
 get_overscan() {
   OVS=$(get_config_var disable_overscan $CONFIG)
   if [ $OVS -eq 1 ]; then
@@ -569,6 +575,7 @@ do_blanking() {
     if [ "$RET" -eq "$CURRENT" ]; then
       ASK_TO_REBOOT=1
     fi
+    ensure_user_conf_dir
     mkdir -p "$HOMEDIR/.config/labwc/"
     chown -R $USER:$USER "$HOMEDIR/.config/labwc/"
     if [ "$RET" -eq 0 ] ; then
@@ -663,6 +670,7 @@ update_labwc_keyboard() {
   VARIANT=$(grep XKBVARIANT /etc/default/keyboard | cut -d= -f2 | tr -d '"')
   OPTIONS=$(grep XKBOPTIONS /etc/default/keyboard | cut -d= -f2 | tr -d '"')
   UFILE=$LABWCENV_FILE
+  ensure_user_conf_dir
   mkdir -p "$HOMEDIR/.config/labwc/"
   chown -R $USER:$USER "$HOMEDIR/.config/labwc/"
   if [ -e $UFILE ] ; then
@@ -677,7 +685,10 @@ update_labwc_keyboard() {
     echo XKB_DEFAULT_OPTIONS=$OPTIONS >> $UFILE
   fi
   chown $USER:$USER $UFILE
-  UFILE="/usr/share/labwc/environment"
+  UFILE="/etc/xdg/labwc-greeter/environment"
+  if [ ! -e $UFILE ] ; then
+    UFILE="/usr/share/labwc/environment"
+  fi
   if [ -e $UFILE ] ; then
     if grep -q XKB_DEFAULT_MODEL $UFILE ; then sed -i s/XKB_DEFAULT_MODEL.*/XKB_DEFAULT_MODEL=$MODEL/ $UFILE ; else echo XKB_DEFAULT_MODEL=$MODEL >> $UFILE ; fi
     if grep -q XKB_DEFAULT_LAYOUT $UFILE ; then sed -i s/XKB_DEFAULT_LAYOUT.*/XKB_DEFAULT_LAYOUT=$LAYOUT/ $UFILE ; else echo XKB_DEFAULT_LAYOUT=$LAYOUT >> $UFILE ; fi
@@ -1993,6 +2004,110 @@ do_network_install_ui() {
         ;;
     esac
     rpi-eeprom-config --apply $EECFG $FILNAME
+    ASK_TO_REBOOT=1
+  fi
+ }
+
+do_libliftoff() {
+  if [ "$INTERACTIVE" = True ]; then
+    RET=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "libliftoff Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+        "L1 Disable" "Disable libliftoff hardware overlays" \
+        "L2 Enable" "Enable libliftoff hardware overlays (experimental)" \
+        3>&1 1>&2 2>&3)
+  else
+    RET=$1
+    true
+  fi
+  if [ $? -eq 0 ]; then
+    case "$RET" in
+      L1*)
+        LIBLIFTOFF_ENABLED=0
+        STATUS="disabled"
+        ;;
+      L2*)
+        LIBLIFTOFF_ENABLED=1
+        STATUS="enabled"
+        ;;
+      *)
+        whiptail --msgbox "Programmer error, unrecognised libliftoff option" 20 60 2
+        return 1
+        ;;
+    esac
+
+    # Create the config dir and/or environment file, if needed
+    if [ -z $HOMEDIR ]; then
+      whiptail --msgbox "Unknown user home directory" 20 60 2
+      return 1
+    fi
+    LABWC_DIR="$HOMEDIR/.config/labwc"
+    if [ ! -e $LABWC_DIR ]; then
+      mkdir -p $LABWC_DIR
+      chown $USER:$USER $HOMEDIR/.config $LABWC_DIR
+    fi
+    if [ ! -e $LABWCENV_FILE ]; then
+      touch $LABWCENV_FILE
+      chown $USER:$USER $LABWCENV_FILE
+    fi
+
+    # If there is already a libliftoff line in the env file, replace it.
+    # Otherwise, add one.
+    if grep -q WLR_DRM_FORCE_LIBLIFTOFF $LABWCENV_FILE; then
+      sed -i "s/^.*WLR_DRM_FORCE_LIBLIFTOFF.*$/WLR_DRM_FORCE_LIBLIFTOFF=$LIBLIFTOFF_ENABLED/" $LABWCENV_FILE
+    else
+      echo "WLR_DRM_FORCE_LIBLIFTOFF=$LIBLIFTOFF_ENABLED" >>$LABWCENV_FILE
+    fi
+
+    ASK_TO_REBOOT=1
+  else
+    return 0
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "libliftoff is $STATUS" 20 60 1
+  fi
+}
+
+# shellcheck disable=SC2120
+do_power_off_on_halt() {
+  if [ "$INTERACTIVE" = True ]; then
+    BOOTOPT=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Configure shutdown behaviour." "$WT_HEIGHT" "$WT_WIDTH" "$WT_MENU_HEIGHT" \
+      "B1 Full power off" "Switch off Pi power management (PMIC) outputs on Pi4 / Pi5 (recommended)." \
+      "B2 VPU sleep mode" "Compatibility mode for HATs (e.g. POE HAT) and GPIO power buttons (Pi4)." \
+      3>&1 1>&2 2>&3)
+  else
+    BOOTOPT=$1
+    true
+  fi
+
+  # shellcheck disable=SC2181
+  if [ $? -eq 0 ]; then
+    get_bootloader_filename
+    if [ "${FILNAME}" = "none" ]; then
+       if [ "$INTERACTIVE" = True ]; then
+          return 0
+       else
+          return 1
+       fi
+    fi
+    EECFG=$(mktemp)
+    rpi-eeprom-config > "$EECFG"
+    sed "$EECFG" -i -e "/POWER_OFF_ON_HALT/d"
+    sed "$EECFG" -i -e "/WAKE_ON_GPIO/d"
+    case "$BOOTOPT" in
+      B1*)
+         echo "POWER_OFF_ON_HALT=1" >> "$EECFG"
+         echo "WAKE_ON_GPIO=0" >> "$EECFG"
+         ;;
+      B2*)
+         echo "POWER_OFF_ON_HALT=0" >> "$EECFG"
+         echo "WAKE_ON_GPIO=1" >> "$EECFG"
+         true
+         ;;
+      *)
+        whiptail --msgbox "Programmer error, unrecognised boot option" 20 60 2
+        return 1
+        ;;
+    esac
+    rpi-eeprom-config --apply "$EECFG" "$FILNAME"
     ASK_TO_REBOOT=1
   fi
  }
@@ -3464,6 +3579,10 @@ do_squeekboard() {
     OPT=$1
     true
   fi
+  GFILE="/etc/xdg/labwc-greeter/autostart"
+  if [ ! -e $GFILE ] ; then
+    GFILE="/usr/share/labwc/autostart"
+  fi
   case "$OPT" in
     S1*)
       is_installed squeekboard || apt-get install -y squeekboard
@@ -3476,9 +3595,9 @@ Terminal=false
 Type=Application
 NoDisplay=true
 EOF
-      sed -i '/sbtest/d' /usr/share/labwc/autostart
-      if ! grep -q sbout /usr/share/labwc/autostart ; then
-        echo "/usr/bin/sbout &" >> /usr/share/labwc/autostart
+      sed -i '/sbtest/d' $GFILE
+      if ! grep -q sbout $GFILE ; then
+        echo "/usr/bin/sbout &" >> $GFILE
       fi
       PREFIX=""
       if [ -n "$SUDO_USER" ] ; then
@@ -3498,9 +3617,9 @@ Terminal=false
 Type=Application
 NoDisplay=true
 EOF
-      sed -i '/sbout/d' /usr/share/labwc/autostart
-      if ! grep -q sbtest /usr/share/labwc/autostart ; then
-        echo "/usr/bin/sbtest &" >> /usr/share/labwc/autostart
+      sed -i '/sbout/d' $GFILE
+      if ! grep -q sbtest $GFILE ; then
+        echo "/usr/bin/sbtest &" >> $GFILE
       fi
       PREFIX=""
       if [ -n "$SUDO_USER" ] ; then
@@ -3513,8 +3632,8 @@ EOF
     S3*)
       pkill squeekboard
       rm -f /etc/xdg/autostart/squeekboard.desktop
-      sed -i '/sbout/d' /usr/share/labwc/autostart
-      sed -i '/sbtest/d' /usr/share/labwc/autostart
+      sed -i '/sbout/d' $GFILE
+      sed -i '/sbtest/d' $GFILE
       STATUS="disabled"
       ;;
     *)
@@ -3830,12 +3949,14 @@ do_advanced_menu() {
       "A1 Expand Filesystem" "Ensures that all of the SD card is available" \
       "A2 Network Interface Names" "Enable/disable predictable network i/f names" \
       "A3 Network Proxy Settings" "Configure network proxy settings" \
-      "A4 Boot Order" "Choose SD, network, USB or NVMe device boot priority" \
-      "A5 Bootloader Version" "Select latest or factory default bootloader software" \
+      "A4 Boot Order" "Choose boot device priority (SD/net/USB/NVMe)" \
+      "A5 Bootloader Version" "Select bootloader (latest/factory default)" \
       "A6 Wayland" "Switch between X and Wayland backends" \
       "A7 Audio Config" "Set audio control system" \
       "A8 PCIe Speed" "Set PCIe x1 port speed" \
-      "A9 Network install UI" "Select when to display the bootloader network-install UI" \
+      "A9 Network Install UI" "Select display of bootloader network install UI" \
+      "A10 Libliftoff" "Enable/disable libliftoff hardware overlays" \
+      "A11 Shutdown Behaviour" "Configure shutdown behavior" \
       3>&1 1>&2 2>&3)
   elif is_pi ; then
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -3844,6 +3965,7 @@ do_advanced_menu() {
       "A3 Network Proxy Settings" "Configure network proxy settings" \
       "A6 Wayland" "Switch between X and Wayland backends" \
       "A7 Audio Config" "Set audio control system" \
+      "A10 Libliftoff" "Enable/disable libliftoff hardware overlays" \
       3>&1 1>&2 2>&3)
   else
     FUN=$(whiptail --title "Raspberry Pi Software Configuration Tool (raspi-config)" --menu "Advanced Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Back --ok-button Select \
@@ -3851,6 +3973,7 @@ do_advanced_menu() {
       "A3 Network Proxy Settings" "Configure network proxy settings" \
       "A6 Wayland" "Switch between X and Wayland backends" \
       "A7 Audio Config" "Set audio control system" \
+      "A10 Libliftoff" "Enable/disable libliftoff hardware overlays" \
       3>&1 1>&2 2>&3)
   fi
   RET=$?
@@ -3867,6 +3990,8 @@ do_advanced_menu() {
       A7\ *) do_audioconf ;;
       A8\ *) do_pci ;;
       A9\ *) do_network_install_ui ;;
+      A10\ *) do_libliftoff ;;
+      A11\ *) do_power_off_on_halt ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   fi
